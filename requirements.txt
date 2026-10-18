@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+SQLAlchemy
+psycopg2-binary
+pydantic
+email-validator
+python-dotenv
+python-jose[cryptography]
+passlib
+python-multipart
+Pillow
+pytesseract
+pdf2image
+requests
+ollama
+openai
