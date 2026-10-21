@@ -1,22 +1,27 @@
+
+import os
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
+from dotenv import load_dotenv
 from jose import jwt
 
+# Load the backend .env for local development.
+# Render will provide SECRET_KEY through its environment settings.
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(ENV_FILE)
 
-# =========================================================
-# JWT Configuration
-# =========================================================
+SECRET_KEY = os.getenv("SECRET_KEY")
 
-SECRET_KEY = "verified-portfolio-builder-secret-key-change-later"
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY is missing. Configure it in the backend .env "
+        "or your deployment environment."
+    )
 
 ALGORITHM = "HS256"
-
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-
-# =========================================================
-# Create Access Token
-# =========================================================
 
 def create_access_token(
     data: dict,
@@ -25,28 +30,16 @@ def create_access_token(
     to_encode = data.copy()
 
     if expires_delta:
-        expire = (
-            datetime.now(timezone.utc)
-            + expires_delta
-        )
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = (
-            datetime.now(timezone.utc)
-            + timedelta(
-                minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-            )
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
-    to_encode.update(
-        {
-            "exp": expire,
-        }
-    )
+    to_encode.update({"exp": expire})
 
-    encoded_jwt = jwt.encode(
+    return jwt.encode(
         to_encode,
         SECRET_KEY,
         algorithm=ALGORITHM,
     )
-
-    return encoded_jwt
