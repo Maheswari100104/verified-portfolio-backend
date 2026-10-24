@@ -14,3 +14,4 @@ pdf2image
 requests
 ollama
 openai
+argon2-cffi
