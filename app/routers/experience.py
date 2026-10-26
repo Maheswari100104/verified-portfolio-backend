@@ -1,3 +1,7 @@
+
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -18,6 +22,51 @@ router = APIRouter(
 
 
 # ============================================================
+# HELPER: CONVERT MONTH OR DATE STRINGS TO PYTHON DATE OBJECTS
+# ============================================================
+
+def parse_experience_date(value) -> Optional[date]:
+    """
+    Accepts:
+      - None or empty string -> None
+      - YYYY-MM              -> first day of that month
+      - YYYY-MM-DD           -> the supplied date
+
+    Examples:
+      2026-05    -> 2026-05-01
+      2026-05-15 -> 2026-05-15
+    """
+
+    if value is None:
+        return None
+
+    if isinstance(value, date):
+        return value
+
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    try:
+        # HTML month input sends YYYY-MM.
+        if len(value) == 7:
+            return date.fromisoformat(f"{value}-01")
+
+        # Full date input sends YYYY-MM-DD.
+        return date.fromisoformat(value)
+
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Invalid experience date '{value}'. "
+                "Use YYYY-MM or YYYY-MM-DD."
+            ),
+        )
+
+
+# ============================================================
 # CREATE EXPERIENCE
 # ============================================================
 
@@ -31,7 +80,7 @@ def create_experience(
     experience: ExperienceCreate,
     db: Session = Depends(get_db),
 ):
-    # Check whether student profile exists
+    # Check whether the student profile exists.
     student = (
         db.query(StudentProfile)
         .filter(StudentProfile.id == student_profile_id)
@@ -40,13 +89,19 @@ def create_experience(
 
     if not student:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Student profile not found",
         )
 
-    # If currently working, there should be no end date
-    if experience.is_current:
-        experience.end_date = None
+    # Convert incoming dates before saving to PostgreSQL.
+    start_date = parse_experience_date(experience.start_date)
+
+    # Current employment should not have an end date.
+    end_date = (
+        None
+        if experience.is_current
+        else parse_experience_date(experience.end_date)
+    )
 
     new_experience = Experience(
         student_profile_id=student_profile_id,
@@ -54,15 +109,20 @@ def create_experience(
         position=experience.position,
         employment_type=experience.employment_type,
         location=experience.location,
-        start_date=experience.start_date,
-        end_date=experience.end_date,
+        start_date=start_date,
+        end_date=end_date,
         is_current=experience.is_current,
         description=experience.description,
     )
 
-    db.add(new_experience)
-    db.commit()
-    db.refresh(new_experience)
+    try:
+        db.add(new_experience)
+        db.commit()
+        db.refresh(new_experience)
+
+    except Exception:
+        db.rollback()
+        raise
 
     return new_experience
 
@@ -79,7 +139,7 @@ def get_experiences(
     student_profile_id: int,
     db: Session = Depends(get_db),
 ):
-    # Check student profile
+    # Check whether the student profile exists.
     student = (
         db.query(StudentProfile)
         .filter(StudentProfile.id == student_profile_id)
@@ -88,15 +148,14 @@ def get_experiences(
 
     if not student:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Student profile not found",
         )
 
     experiences = (
         db.query(Experience)
         .filter(
-            Experience.student_profile_id
-            == student_profile_id
+            Experience.student_profile_id == student_profile_id
         )
         .order_by(Experience.id.desc())
         .all()
@@ -125,7 +184,7 @@ def get_experience(
 
     if not experience:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Experience not found",
         )
 
@@ -153,7 +212,7 @@ def update_experience(
 
     if not experience:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Experience not found",
         )
 
@@ -161,15 +220,31 @@ def update_experience(
         exclude_unset=True
     )
 
-    # If currently working, remove end date
+    # Convert dates before assigning them to SQLAlchemy.
+    if "start_date" in update_data:
+        update_data["start_date"] = parse_experience_date(
+            update_data["start_date"]
+        )
+
+    if "end_date" in update_data:
+        update_data["end_date"] = parse_experience_date(
+            update_data["end_date"]
+        )
+
+    # If currently working, remove the end date.
     if update_data.get("is_current") is True:
         update_data["end_date"] = None
 
     for field, value in update_data.items():
         setattr(experience, field, value)
 
-    db.commit()
-    db.refresh(experience)
+    try:
+        db.commit()
+        db.refresh(experience)
+
+    except Exception:
+        db.rollback()
+        raise
 
     return experience
 
@@ -193,12 +268,17 @@ def delete_experience(
 
     if not experience:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Experience not found",
         )
 
-    db.delete(experience)
-    db.commit()
+    try:
+        db.delete(experience)
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "message": "Experience deleted successfully"
