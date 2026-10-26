@@ -27,14 +27,16 @@ router = APIRouter(
 
 def parse_experience_date(value) -> Optional[date]:
     """
-    Accepts:
-      - None or empty string -> None
-      - YYYY-MM              -> first day of that month
-      - YYYY-MM-DD           -> the supplied date
+    Converts incoming date values into Python date objects.
 
-    Examples:
-      2026-05    -> 2026-05-01
-      2026-05-15 -> 2026-05-15
+    Accepted values:
+        None          -> None
+        ""            -> None
+        "2026-05"     -> date(2026, 5, 1)
+        "2026-05-15"  -> date(2026, 5, 15)
+
+    HTML month inputs send dates in YYYY-MM format.
+    PostgreSQL DATE columns require complete dates.
     """
 
     if value is None:
@@ -49,11 +51,9 @@ def parse_experience_date(value) -> Optional[date]:
         return None
 
     try:
-        # HTML month input sends YYYY-MM.
         if len(value) == 7:
             return date.fromisoformat(f"{value}-01")
 
-        # Full date input sends YYYY-MM-DD.
         return date.fromisoformat(value)
 
     except ValueError:
@@ -93,10 +93,12 @@ def create_experience(
             detail="Student profile not found",
         )
 
-    # Convert incoming dates before saving to PostgreSQL.
-    start_date = parse_experience_date(experience.start_date)
+    # Convert frontend date strings before saving.
+    start_date = parse_experience_date(
+        experience.start_date
+    )
 
-    # Current employment should not have an end date.
+    # Current employment must not have an end date.
     end_date = (
         None
         if experience.is_current
@@ -216,25 +218,28 @@ def update_experience(
             detail="Experience not found",
         )
 
+    # Get only the fields supplied by the frontend.
     update_data = experience_data.model_dump(
         exclude_unset=True
     )
 
-    # Convert dates before assigning them to SQLAlchemy.
+    # Convert the start date if supplied.
     if "start_date" in update_data:
         update_data["start_date"] = parse_experience_date(
             update_data["start_date"]
         )
 
+    # Convert the end date if supplied.
     if "end_date" in update_data:
         update_data["end_date"] = parse_experience_date(
             update_data["end_date"]
         )
 
-    # If currently working, remove the end date.
+    # If currently working, always clear the end date.
     if update_data.get("is_current") is True:
         update_data["end_date"] = None
 
+    # Apply the updated fields.
     for field, value in update_data.items():
         setattr(experience, field, value)
 
