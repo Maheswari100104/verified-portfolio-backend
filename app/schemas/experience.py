@@ -1,5 +1,8 @@
-from pydantic import BaseModel, ConfigDict
+
+from datetime import date
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class ExperienceCreate(BaseModel):
@@ -42,8 +45,10 @@ class ExperienceResponse(BaseModel):
     employment_type: Optional[str] = None
     location: Optional[str] = None
 
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    # PostgreSQL DATE values are parsed as Python date objects.
+    # Pydantic serializes them as YYYY-MM-DD strings in JSON.
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
     is_current: bool
 
