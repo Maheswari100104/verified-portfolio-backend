@@ -78,7 +78,7 @@ def get_student_dashboard(
 
     if profile.profile_photo:
         profile_photo_url = (
-            "http://127.0.0.1:8000"
+            "https://verified-portfolio-backend.onrender.com"
             "/student/profile/me/photo"
         )
 

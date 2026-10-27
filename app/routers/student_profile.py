@@ -35,7 +35,7 @@ router = APIRouter(
 # Constants
 # =========================================================
 
-BACKEND_URL = "http://127.0.0.1:8000"
+BACKEND_URL = "https://verified-portfolio-backend.onrender.com"
 
 MAX_PROFILE_PHOTO_SIZE = 5 * 1024 * 1024
 
