@@ -338,34 +338,44 @@ async def verify_education(
     # 9. Save Verification Result
     # =====================================================
 
-    verification = EducationVerification(
-        education_id=education_id,
-        document=file_data,
-        document_name=(
-            document.filename or "education_document"
-        ),
-        document_type=(
-            document.content_type
-            or "application/octet-stream"
-        ),
-        document_size=len(file_data),
-        document_hash=document_hash,
-        ocr_data=extracted_text,
-        status=status,
-        verification_message=message,
-        checked_at=datetime.now(timezone.utc),
+       # =====================================================
+    # 9. Save or Update Verification Result
+    # =====================================================
+
+    verification = (
+        db.query(EducationVerification)
+        .filter(
+            EducationVerification.education_id == education_id
+        )
+        .first()
     )
 
-    db.add(verification)
+    if verification is None:
+        verification = EducationVerification(
+            education_id=education_id,
+        )
+        db.add(verification)
+
+    verification.document = file_data
+    verification.document_name = (
+        document.filename or "education_document"
+    )
+    verification.document_type = (
+        document.content_type or "application/octet-stream"
+    )
+    verification.document_size = len(file_data)
+    verification.document_hash = document_hash
+    verification.ocr_data = extracted_text
+    verification.status = status
+    verification.verification_message = message
+    verification.checked_at = datetime.now(timezone.utc)
 
     try:
         db.commit()
         db.refresh(verification)
-
     except Exception:
         db.rollback()
         raise
-
     # =====================================================
     # 10. Return Verification Result
     # =====================================================
