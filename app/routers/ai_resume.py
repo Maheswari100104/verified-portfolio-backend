@@ -1,8 +1,10 @@
+
 from typing import Any
+import os
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-import ollama
+from pydantic import BaseModel, Field
+from groq import Groq
 
 
 # =========================================================
@@ -22,13 +24,13 @@ router = APIRouter(
 class ResumeSummaryRequest(BaseModel):
     personal: dict[str, Any] | None = None
 
-    education: list[Any] = []
-    skills: list[Any] = []
-    projects: list[Any] = []
-    experience: list[Any] = []
-    certificates: list[Any] = []
-    achievements: list[Any] = []
-    languages: list[Any] = []
+    education: list[Any] = Field(default_factory=list)
+    skills: list[Any] = Field(default_factory=list)
+    projects: list[Any] = Field(default_factory=list)
+    experience: list[Any] = Field(default_factory=list)
+    certificates: list[Any] = Field(default_factory=list)
+    achievements: list[Any] = Field(default_factory=list)
+    languages: list[Any] = Field(default_factory=list)
 
 
 # =========================================================
@@ -50,28 +52,15 @@ class ResumeSummaryResponse(BaseModel):
 def generate_resume_summary(
     data: ResumeSummaryRequest,
 ):
-
     # =====================================================
     # PERSONAL INFORMATION
     # =====================================================
 
     personal = data.personal or {}
 
-    full_name = personal.get(
-        "fullName",
-        "",
-    )
-
-    headline = personal.get(
-        "headline",
-        "",
-    )
-
-    about = personal.get(
-        "about",
-        "",
-    )
-
+    full_name = personal.get("fullName", "")
+    headline = personal.get("headline", "")
+    about = personal.get("about", "")
 
     # =====================================================
     # AI PROMPT
@@ -143,31 +132,44 @@ Do not add a heading.
 Do not explain your answer.
 """
 
+    # =====================================================
+    # CONNECT TO GROQ AI
+    # =====================================================
+
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        print("AI Resume Summary Error: GROQ_API_KEY is not configured.")
+
+        raise HTTPException(
+            status_code=500,
+            detail="AI service is not configured.",
+        )
 
     # =====================================================
-    # CALL LOCAL AI
+    # GENERATE SUMMARY USING GROQ
     # =====================================================
 
     try:
+        client = Groq(api_key=api_key)
 
-        response = ollama.chat(
-            model="llama3.2:3b",
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "user",
                     "content": prompt,
                 }
             ],
+            temperature=0.3,
+            max_completion_tokens=300,
         )
 
         summary = (
-            response["message"]["content"]
-            .strip()
-        )
-
+            response.choices[0].message.content or ""
+        ).strip()
 
     except Exception as error:
-
         print(
             "AI Resume Summary Error:",
             error,
@@ -178,18 +180,15 @@ Do not explain your answer.
             detail="Failed to generate resume summary.",
         )
 
-
     # =====================================================
     # VALIDATE RESPONSE
     # =====================================================
 
     if not summary:
-
         raise HTTPException(
             status_code=500,
             detail="AI returned an empty resume summary.",
         )
-
 
     # =====================================================
     # RETURN RESPONSE

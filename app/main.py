@@ -59,7 +59,7 @@ from app.models.endorsement import Endorsement
 from app.models.opportunity import Opportunity
 from app.models.opportunity_interest import OpportunityInterest
 
-
+from app.models.notification import Notification
 # =========================================================
 # SHORTLISTED CANDIDATE MODEL
 # =========================================================
