@@ -163,6 +163,7 @@ Do not explain your answer.
             ],
             temperature=0.3,
             max_completion_tokens=300,
+            reasoning_effort="low",
         )
 
         summary = (
