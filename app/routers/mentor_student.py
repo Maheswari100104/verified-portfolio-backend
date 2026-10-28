@@ -997,13 +997,13 @@ def get_candidates(
                     or ""
                 ).strip().lower()
 
-                if status == "verified":
+                if status in ("verified", "matched"):
                     education_verified = True
 
-                elif status == "pending":
+                elif status in ("pending", "mismatch"):
                     education_pending = True
 
-                elif status == "rejected":
+                elif status in ("rejected", "flagged"):
                     education_rejected = True
 
             if education_verified:
